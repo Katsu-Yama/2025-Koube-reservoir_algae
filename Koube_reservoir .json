@@ -1,0 +1,21 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "id": "karasuhara", "name": "烏原貯水池" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[135.18,34.70],[135.20,34.70],[135.20,34.72],[135.18,34.72],[135.18,34.70]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "id": "nunobiki", "name": "布引貯水池" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[135.19,34.72],[135.21,34.72],[135.21,34.74],[135.19,34.74],[135.19,34.72]]]
+      }
+    }
+  ]
+}
