@@ -1,0 +1,16 @@
+main/
+├ analysis/
+│  ├ run_batch.py          ★ 実行用メイン
+│  ├ gee_utils.py          ★ GEE共通
+│  ├ indices.py            ★ NDCI/NDTI/FAI
+│  ├ date_selector.py      ★ 日付選定ロジック
+│  └ config/
+│     └ reservoirs.geojson ★ 貯水池ROI
+│
+└ data/
+   ├ karasuhara/
+   │  ├ images/
+   │  ├ timeseries.csv
+   │  └ meta.json
+   └ nunobiki/
+      └ ...
