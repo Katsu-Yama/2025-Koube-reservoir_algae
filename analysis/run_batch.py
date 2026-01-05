@@ -3,9 +3,9 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import ee, pandas as pd
 import geemap
-from gee_utils import get_s2_collection
-from indices import add_indices
-from date_selector import select_dates
+from gee_utils import get_s2_collection   #gee_utils.py
+from indices import add_indices   #indices.py
+from date_selector import select_dates   #date_selector.py
 
 # ------------------------------------------------------------
 # このスクリプトの目的（初心者向け概要）
