@@ -8,9 +8,18 @@ main/
 │     └ reservoirs.geojson ★ 貯水池ROI
 │
 └ data/
-   ├ karasuhara/
-   │  ├ images/
-   │  ├ timeseries.csv
-   │  └ meta.json
-   └ nunobiki/
-      └ ...
+│  ├ karasuhara/
+│  │  ├ images/
+│  │  ├ timeseries.csv
+│  │  └ meta.json
+│  └ nunobiki/
+│      └ ...
+dashboard/
+├ app.py                ★ Flask本体
+├ templates/
+│  └ index.html         ★ HTML
+└ static/
+   └ css/
+      └ style.css       ★ 任意（なくても可）
+
+
