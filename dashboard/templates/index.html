@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>貯水池 藻類モニタリング</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    .top { display: flex; justify-content: space-between; }
+    .main { display: grid; grid-template-columns: 1fr 2fr 2fr; gap: 20px; }
+    img { width: 100%; border: 1px solid #ccc; }
+    .charts div { margin-bottom: 30px; }
+  </style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <h2>使用衛星：Sentinel-2</h2>
+    <p>最新取得日：{{ meta.latest_date }}</p>
+  </div>
+  <div>
+    <form method="get">
+      <select name="reservoir" onchange="this.form.submit()">
+        {% for k,v in reservoirs.items() %}
+          <option value="{{ k }}" {% if k==rid %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit">更新</button>
+    </form>
+  </div>
+</div>
+
+<hr>
+
+<div class="main">
+  <!-- 左 -->
+  <div>
+    <h3>貯水池</h3>
+    <p><strong>{{ reservoirs[rid] }}</strong></p>
+  </div>
+
+  <!-- 中央：画像 -->
+  <div>
+    <h3>藻類濃度（NDCI）</h3>
+    <img src="../data/{{ rid }}/images/latest.png">
+    <img src="../data/{{ rid }}/images/m1.png">
+    <img src="../data/{{ rid }}/images/m2.png">
+  </div>
+
+  <!-- 右：グラフ -->
+  <div class="charts">
+    <h3>直近1年 指標</h3>
+    <div id="ndci"></div>
+    <div id="ndti"></div>
+    <div id="fai"></div>
+  </div>
+</div>
+
+<script>
+function draw(id, data, title) {
+  Plotly.newPlot(id, [{
+    x: data.map(d => d.date),
+    y: data.map(d => Object.values(d)[1]),
+    type: 'scatter'
+  }], { title: title });
+}
+
+draw("ndci", {{ charts.ndci | tojson }}, "NDCI");
+draw("ndti", {{ charts.ndti | tojson }}, "NDTI");
+draw("fai",  {{ charts.fai  | tojson }}, "FAI");
+</script>
+
+</body>
+</html>
