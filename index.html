@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>貯水池藻類監視ダッシュボード（試作：画像切替＋CSVグラフ）</title>
+
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --border: #e5e7eb;
+      --text: #0f172a;
+      --muted: #64748b;
+      --blue: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    header {
+      background: linear-gradient(90deg, #1d4ed8, #2563eb);
+      color: #fff;
+      padding: 14px 18px;
+    }
+    header .title { font-weight: 700; font-size: 18px; }
+    header .sub { font-size: 12px; opacity: .9; margin-top: 2px; }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 260px 1fr 460px;
+      gap: 12px;
+      align-items: start;
+    }
+    @media (max-width: 1100px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .section-title {
+      font-weight: 700;
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
+
+    /* left list */
+    .reservoir-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+    }
+    .reservoir-item.selected {
+      outline: 2px solid rgba(37,99,235,.25);
+      border-color: rgba(37,99,235,.45);
+    }
+    .reservoir-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+    }
+    .badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: #f8fafc;
+      white-space: nowrap;
+    }
+    .badge.ok { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+    .badge.nodata { color: #475569; background: #f1f5f9; border-color: #e2e8f0; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .note {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    /* center: single image viewer */
+    .viewer {
+      display: grid;
+      grid-template-rows: auto auto auto;
+      gap: 10px;
+    }
+    .viewer-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .viewer-left {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1;
+    }
+    .btn:hover { border-color: rgba(37,99,235,.35); }
+    .btn.primary {
+      background: rgba(37,99,235,.08);
+      border-color: rgba(37,99,235,.35);
+      color: #1d4ed8;
+      font-weight: 700;
+    }
+    .pill {
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--muted);
+    }
+    .viewer-imgwrap {
+      display: flex;
+      justify-content: center;
+    }
+    .viewer-img {
+      width: 70%;
+      height: auto;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+    }
+    @media (max-width: 1100px) {
+      .viewer-img { width: 100%; }
+    }
+
+    /* right: KPIs + charts */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .kpi {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      min-height: 68px;
+    }
+    .kpi .label { font-size: 11px; color: var(--muted); }
+    .kpi .value { font-size: 16px; font-weight: 800; margin-top: 4px; }
+    .kpi .date { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+    .chart-card {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      background: #fff;
+      margin-bottom: 10px;
+    }
+    .chart-title {
+      font-size: 12px;
+      font-weight: 700;
+      margin: 0 0 6px 0;
+    }
+    canvas { width: 100% !important; height: 220px !important; }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="title">貯水池藻類監視ダッシュボード（試作版）</div>
+    <div class="sub">画像は切替表示、時系列はCSVを読み込みブラウザで描画（GitHub Pages想定）</div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <!-- Left -->
+      <aside class="card">
+        <div class="section-title">貯水池一覧</div>
+
+        <div class="reservoir-item selected">
+          <div class="reservoir-top">
+            <div>
+              <div style="font-weight:700;">烏原貯水池</div>
+              <div class="muted">データあり（表示対象）</div>
+            </div>
+            <span class="badge ok">表示中</span>
+          </div>
+        </div>
+
+        <div class="reservoir-item">
+          <div class="reservoir-top">
+            <div>
+              <div style="font-weight:700;">布引貯水池</div>
+              <div class="muted">データなし</div>
+            </div>
+            <span class="badge nodata">データ未取り込み</span>
+          </div>
+        </div>
+
+        <div class="note">
+          ※ 現状は烏原貯水池のみのファイルを表示します。布引貯水池は将来追加予定のプレースホルダです。
+        </div>
+      </aside>
+
+      <!-- Center -->
+      <main class="card">
+        <div class="section-title">NDCI（水域のみ）画像ビューア</div>
+
+        <div class="viewer">
+          <div class="viewer-toolbar">
+            <div class="viewer-left">
+              <button class="btn primary" id="btnFirst" title="一番上（最新）へ">⏮</button>
+              <button class="btn" id="btnPrev" title="一つ上（新しい方向）">▲</button>
+              <button class="btn" id="btnNext" title="一つ下（古い方向）">▼</button>
+
+              <label class="pill">
+                日付選択：
+                <input id="datePicker" type="date" style="border:none; outline:none; font:inherit; color:inherit; background:transparent;">
+              </label>
+            </div>
+
+            <div class="pill" id="imgLabel">表示中：—</div>
+          </div>
+
+          <div class="viewer-imgwrap">
+            <img id="ndciImg" class="viewer-img" alt="NDCI image" />
+          </div>
+
+          <div class="note">
+            ※ 日付選択は「その日付に最も近い画像」を表示します。<br/>
+            ※ 画像・CSVは GitHub Pages で配信できる場所（例：<code>./data/</code>）に置いてください。
+          </div>
+        </div>
+      </main>
+
+      <!-- Right -->
+      <section class="card">
+        <div class="section-title">最新値（CSVの最新行）</div>
+
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="label">NDCI_mean</div>
+            <div class="value" id="kpiNdci">—</div>
+            <div class="date" id="kpiDate">latest: —</div>
+          </div>
+          <div class="kpi">
+            <div class="label">FAI_mean（fai_floating）</div>
+            <div class="value" id="kpiFai">—</div>
+            <div class="date" id="kpiDate2">latest: —</div>
+          </div>
+          <div class="kpi">
+            <div class="label">NDTI_mean</div>
+            <div class="value" id="kpiNdti">—</div>
+            <div class="date" id="kpiDate3">latest: —</div>
+          </div>
+        </div>
+
+        <div class="section-title">時系列（CSVからブラウザで描画）</div>
+
+        <div class="chart-card">
+          <div class="chart-title">藻類量proxy（NDCI）</div>
+          <canvas id="chartNdci"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">浮遊藻類proxy（FAI / fai_floating）</div>
+          <canvas id="chartFai"></canvas>
+        </div>
+
+        <div class="chart-card" style="margin-bottom:0;">
+          <div class="chart-title">濁度proxy（NDTI）</div>
+          <canvas id="chartNdti"></canvas>
+        </div>
+
+        <div class="note" style="margin-top:8px;">
+          ※ グラフはCSVを fetch するため、ローカルファイル直開きだと動かない場合があります。GitHub Pages 上で動作します。
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // =========================
+    // GitHub Pages配置前提のパス
+    // - あなたの想定：画像/CSVは repo の /data に置く
+    // - Pagesで配信されるURLは tree/ ではなく、サイト上の相対パスになります
+    //   例: https://<user>.github.io/<repo>/data/xxxx.png
+    // =========================
+    const DATA_DIR = "./data"; // Pages上で html と同階層に data/ がある想定
+    const CSV_URL  = `${DATA_DIR}/timeseries_ndci_ndti_fai.csv`;
+
+    // 画像は「日付 -> ファイル名」の対応で管理（必要ならここを増やす）
+    const IMAGES = [
+      { date: "2025-12-28", file: "2025-12-28.png" },
+      { date: "2025-12-23", file: "2025-12-23.png" },
+      { date: "2025-12-20", file: "2025-12-20.png" },
+      { date: "2025-12-18", file: "2025-12-18.png" }
+    ];
+
+    // --- Image viewer state ---
+    let currentIndex = 0; // 0 = 最新（先頭）
+
+    const elImg = document.getElementById("ndciImg");
+    const elLabel = document.getElementById("imgLabel");
+    const elDatePicker = document.getElementById("datePicker");
+
+    function setImageByIndex(idx) {
+      if (idx < 0) idx = 0;
+      if (idx > IMAGES.length - 1) idx = IMAGES.length - 1;
+      currentIndex = idx;
+
+      const it = IMAGES[currentIndex];
+      elImg.src = `${DATA_DIR}/${it.file}`;
+      elImg.alt = `NDCI ${it.date}`;
+      elLabel.textContent = `表示中：${it.date}（${currentIndex + 1}/${IMAGES.length}）`;
+
+      // datePickerは "表示画像の日付" に合わせる（ユーザー選択の近傍にスナップする挙動が直感的）
+      elDatePicker.value = it.date;
+    }
+
+    function dateToNum(d) { // "YYYY-MM-DD" -> milliseconds
+      const t = new Date(d + "T00:00:00");
+      return t.getTime();
+    }
+
+    function setImageByNearestDate(targetDateStr) {
+      const target = dateToNum(targetDateStr);
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < IMAGES.length; i++) {
+        const dist = Math.abs(dateToNum(IMAGES[i].date) - target);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestIdx = i;
+        }
+      }
+      setImageByIndex(bestIdx);
+    }
+
+    document.getElementById("btnFirst").addEventListener("click", () => setImageByIndex(0));
+    document.getElementById("btnPrev").addEventListener("click", () => setImageByIndex(currentIndex - 1));
+    document.getElementById("btnNext").addEventListener("click", () => setImageByIndex(currentIndex + 1));
+    elDatePicker.addEventListener("change", (e) => {
+      const v = e.target.value;
+      if (!v) return;
+      setImageByNearestDate(v);
+    });
+
+    // 初期表示
+    setImageByIndex(0);
+
+    // =========================
+    // CSV -> Charts (Chart.js)
+    // =========================
+    function parseCSV(text) {
+      // シンプルCSV想定（カンマ区切り、クォートや改行を含む複雑ケースは想定外）
+      const lines = text.trim().split(/\r?\n/);
+      const header = lines[0].split(",").map(s => s.trim());
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        if (!lines[i].trim()) continue;
+        const cols = lines[i].split(",").map(s => s.trim());
+        const obj = {};
+        for (let j = 0; j < header.length; j++) obj[header[j]] = cols[j];
+        rows.push(obj);
+      }
+      return { header, rows };
+    }
+
+    function toNumber(x) {
+      const v = Number(x);
+      return Number.isFinite(v) ? v : null;
+    }
+
+    let chartNdci, chartFai, chartNdti;
+
+    function makeLineChart(canvasId, labels, data, yLabel) {
+      const ctx = document.getElementById(canvasId);
+      return new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: yLabel,
+            data,
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true }
+          },
+          scales: {
+            x: {
+              ticks: { maxTicksLimit: 6 }
+            },
+            y: {
+              title: { display: true, text: yLabel }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadAndRender() {
+      try {
+        const res = await fetch(CSV_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`);
+        const text = await res.text();
+        const { rows } = parseCSV(text);
+
+        // date 昇順に整列（念のため）
+        rows.sort((a,b) => dateToNum(a.date) - dateToNum(b.date));
+
+        const labels = rows.map(r => r.date);
+        const ndci = rows.map(r => toNumber(r.NDCI_mean));
+        const fai  = rows.map(r => toNumber(r.FAI_mean));
+        const ndti = rows.map(r => toNumber(r.NDTI_mean));
+
+        // 最新値（最後の行）
+        const latest = rows[rows.length - 1];
+        const latestDate = latest?.date ?? "—";
+
+        document.getElementById("kpiNdci").textContent = (toNumber(latest?.NDCI_mean) ?? "—").toString().slice(0, 6);
+        document.getElementById("kpiFai").textContent  = (toNumber(latest?.FAI_mean) ?? "—").toString().slice(0, 6);
+        document.getElementById("kpiNdti").textContent = (toNumber(latest?.NDTI_mean) ?? "—").toString().slice(0, 7);
+
+        document.getElementById("kpiDate").textContent  = `latest: ${latestDate}`;
+        document.getElementById("kpiDate2").textContent = `latest: ${latestDate}`;
+        document.getElementById("kpiDate3").textContent = `latest: ${latestDate}`;
+
+        // 既存チャートがあれば破棄
+        if (chartNdci) chartNdci.destroy();
+        if (chartFai) chartFai.destroy();
+        if (chartNdti) chartNdti.destroy();
+
+        chartNdci = makeLineChart("chartNdci", labels, ndci, "NDCI_mean");
+        chartFai  = makeLineChart("chartFai",  labels, fai,  "FAI_mean");
+        chartNdti = makeLineChart("chartNdti", labels, ndti, "NDTI_mean");
+
+      } catch (err) {
+        console.error(err);
+        document.getElementById("kpiNdci").textContent = "CSV読込失敗";
+        document.getElementById("kpiFai").textContent  = "CSV読込失敗";
+        document.getElementById("kpiNdti").textContent = "CSV読込失敗";
+      }
+    }
+
+    loadAndRender();
+  </script>
+</body>
+</html>
